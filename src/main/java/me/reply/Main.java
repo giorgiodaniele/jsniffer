@@ -34,6 +34,11 @@ public class Main {
             return;
         }
 
+        if (options.containsKey("list-if")) {
+            listInterfaces();
+            return;
+        }
+
         // Parse filters
         if (options.containsKey("proto")) {
             protoFilter = options.get("proto").toLowerCase();
@@ -121,6 +126,10 @@ public class Main {
                         map.put("iface", args[++i]);
                     }
                     break;
+                case "--list-interfaces":
+                case "--list-if":
+                    map.put("list-if", "");
+                    break;
             }
         }
         return map;
@@ -129,17 +138,37 @@ public class Main {
     private static void printHelp() {
         System.out.println("Usage: java -jar sniffer.jar [options]\n");
         System.out.println("Options:");
-        System.out.println("  -h, --help           Show this help message");
-        System.out.println("  -o, --out <file>     Save captured packets to file");
-        System.out.println("  -p, --proto <proto>  Filter protocol: tcp, udp, icmp, all (default=all)");
-        System.out.println("  --sport <port>       Filter by source port");
-        System.out.println("  --dport <port>       Filter by destination port");
-        System.out.println("  --iface <idx|name>   Select network interface (index or name)");
+        System.out.println("  -h, --help             Show this help message");
+        System.out.println("  -o, --out <file>       Save captured packets to file");
+        System.out.println("  -p, --proto <proto>    Filter protocol: tcp, udp, icmp, all (default=all)");
+        System.out.println("  --sport <port>         Filter by source port");
+        System.out.println("  --dport <port>         Filter by destination port");
+        System.out.println("  --iface <idx|name>     Select network interface (index or name)");
+        System.out.println("  --list-interfaces      List available network interfaces and exit");
         System.out.println("\nExamples:");
         System.out.println("  java -jar sniffer.jar --proto tcp --sport 80");
         System.out.println("  java -jar sniffer.jar --proto udp --dport 53 --out dns.log");
         System.out.println("  java -jar sniffer.jar --iface 1");
         System.out.println("  java -jar sniffer.jar --iface wlan0");
+        System.out.println("  java -jar sniffer.jar --list-interfaces");
+    }
+
+    private static void listInterfaces() {
+        try {
+            List<PcapNetworkInterface> nifs = Pcaps.findAllDevs();
+            if (nifs == null || nifs.isEmpty()) {
+                System.out.println("[INFO] No interfaces found.");
+                return;
+            }
+            System.out.println("[INFO] Available interfaces:");
+            for (int i = 0; i < nifs.size(); i++) {
+                System.out.printf("  [%d] %s - %s%n", i,
+                        nifs.get(i).getName(),
+                        nifs.get(i).getDescription() != null ? nifs.get(i).getDescription() : "No description");
+            }
+        } catch (PcapNativeException e) {
+            System.err.println("[ERR] Could not list interfaces: " + e.getMessage());
+        }
     }
 
     private static PcapNetworkInterface selectNetworkInterface(String ifaceOpt)
