@@ -51,9 +51,9 @@ public class Main {
                 System.out.println("[INFO] Logging packets to file: " + options.get("out"));
             }
 
-            PcapNetworkInterface nif = getFirstNetworkInterface();
+            PcapNetworkInterface nif = selectNetworkInterface(options.get("iface"));
             if (nif == null) {
-                System.err.println("[ERR] No network interfaces found.");
+                System.err.println("[ERR] No valid network interface found.");
                 return;
             }
 
@@ -116,6 +116,11 @@ public class Main {
                         map.put("dport", args[++i]);
                     }
                     break;
+                case "--iface":
+                    if (i + 1 < args.length) {
+                        map.put("iface", args[++i]);
+                    }
+                    break;
             }
         }
         return map;
@@ -129,18 +134,51 @@ public class Main {
         System.out.println("  -p, --proto <proto>  Filter protocol: tcp, udp, icmp, all (default=all)");
         System.out.println("  --sport <port>       Filter by source port");
         System.out.println("  --dport <port>       Filter by destination port");
+        System.out.println("  --iface <idx|name>   Select network interface (index or name)");
         System.out.println("\nExamples:");
         System.out.println("  java -jar sniffer.jar --proto tcp --sport 80");
         System.out.println("  java -jar sniffer.jar --proto udp --dport 53 --out dns.log");
+        System.out.println("  java -jar sniffer.jar --iface 1");
+        System.out.println("  java -jar sniffer.jar --iface wlan0");
     }
 
-    private static PcapNetworkInterface getFirstNetworkInterface()
+    private static PcapNetworkInterface selectNetworkInterface(String ifaceOpt)
             throws PcapNativeException {
         List<PcapNetworkInterface> nifs = Pcaps.findAllDevs();
         if (nifs == null || nifs.isEmpty()) {
             return null;
         }
-        return nifs.get(0);
+
+        if (ifaceOpt == null) {
+            // Nessuna scelta -> mostro lista e prendo la prima
+            System.out.println("[INFO] Available interfaces:");
+            for (int i = 0; i < nifs.size(); i++) {
+                System.out.printf("  [%d] %s - %s%n", i,
+                        nifs.get(i).getName(), nifs.get(i).getDescription());
+            }
+            System.out.println("[INFO] Using default: " + nifs.get(0).getName());
+            return nifs.get(0);
+        }
+
+        try {
+            // Se è un numero, interpreto come indice
+            int idx = Integer.parseInt(ifaceOpt);
+            if (idx >= 0 && idx < nifs.size()) {
+                return nifs.get(idx);
+            } else {
+                System.err.println("[ERR] Invalid interface index.");
+                return null;
+            }
+        } catch (NumberFormatException e) {
+            // Altrimenti cerco per nome
+            for (PcapNetworkInterface nif : nifs) {
+                if (nif.getName().equals(ifaceOpt)) {
+                    return nif;
+                }
+            }
+            System.err.println("[ERR] Interface not found: " + ifaceOpt);
+            return null;
+        }
     }
 
     private static PcapHandle openHandle(PcapNetworkInterface nif)
